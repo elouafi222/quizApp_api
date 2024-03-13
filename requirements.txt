@@ -18,3 +18,4 @@ python-dateutil==2.8.2
 pytz==2023.3.post1
 pyzmq==25.1.2
 requests==2.31.0
+pymongo
