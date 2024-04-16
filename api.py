@@ -25,7 +25,10 @@ def login():
 
     # Vérifier si l'utilisateur existe
     if utilisateur:
-        return jsonify({"message": "oui"}), 200
+        profession = utilisateur.get("fonctionaliter", "")
+        return jsonify({"message": "teacher"}), 200
+    elif db.student.find_one({"email": email, "password": password}):
+        return jsonify({"message": "student"}), 200
     else:
         return jsonify({"message": "non"}), 404
 
@@ -34,26 +37,221 @@ def login():
 def ajouter_utilisateur():
     data = request.json
     print(data.get("nom"))
-    utilisateur = {
-        "id": "50",
-        "nom": data.get("nom"),
-        "email": data.get("email"),
-        "password": data.get("password"),
-    }
-    # Insérer l'utilisateur dans la base de données
-    db.user.insert_one(
-        utilisateur
-    )  # Assurez-vous que "utilisateurs" est le nom de votre collection
-    return jsonify({"message": "Utilisateur ajouté avec succès"}), 201
+
+    email_existant = db.user.find_one(
+        {"email": data.get("email")}
+    ) or db.student.find_one({"email": data.get("email")})
+    if email_existant:
+        # Si un utilisateur avec le même email existe déjà, renvoyer une erreur
+        return jsonify({"message": "emailExiste"}), 201
+
+    if data.get("fonctionaliter") != "student":
+        utilisateur = {
+            "nom": data.get("nom"),
+            "email": data.get("email"),
+            "password": data.get("password"),
+            "quiz": [],
+        }
+
+        # Insérer l'utilisateur dans la collection "user" ou "student" en fonction de sa fonctionalité
+        db.user.insert_one(utilisateur)
+    else:
+        student = {
+            "nom": data.get("nom"),
+            "email": data.get("email"),
+            "password": data.get("password"),
+            "quizpasse": [],
+        }
+
+        db.student.insert_one(student)
+
+    return jsonify({"message": "ok"}), 201
+
+
+@app.route("/createquiz", methods=["POST"])
+def ajouter_quiz():
+    data = request.json
+    print(data.get("emailteacher"))
+
+    email = data.get("emailteacher")
+
+    if email == "":
+        return jsonify({"message": "problemeemail"}), 404
+
+    else:
+        utilisateur = db.user.find_one({"email": email})
+        # Vérifiez si l'utilisateur existe
+        if utilisateur:
+            # Récupérez l'ID de l'utilisateur
+            user_id = utilisateur["_id"]
+
+            quiz = {
+                "quizname": data.get("quizname"),
+                "description": data.get("description"),
+                "codequiz": data.get("codequiz"),
+                "idcreateur": user_id,
+                "question": [],
+            }
+            # Insérer le quiz dans la collection "quiz"
+            result = db.quiz.insert_one(quiz)
+
+            # Récupérer l'ID du quiz créé
+            quiz_id = result.inserted_id
+
+            # Mettre à jour la collection des quizzes de l'utilisateur
+            db.user.update_one({"_id": user_id}, {"$push": {"quiz": quiz_id}})
+
+            return jsonify({"message": "quizcreer"}), 201
+
+        else:
+            return jsonify({"message": "usernotexiste"}), 404
+
+
+@app.route("/recupererAllQuiz", methods=["POST"])
+def recuper_allquiz():
+    data = request.json
+    # data = dataArray[0]
+    print(data.get("emailteacher"))
+
+    email = data.get("emailteacher")
+
+    if email == "":
+        return jsonify({"message": "problemeemail"}), 404
+
+    else:
+        utilisateur = db.user.find_one({"email": email})
+        # Vérifiez si l'utilisateur existe
+        if utilisateur:
+            # Récupérez l'ID de l'utilisateur
+            user_id = utilisateur["_id"]
+
+            # Recherchez tous les quizzes créés par cet utilisateur
+            quizzes_utilisateur = db.quiz.find({"idcreateur": user_id})
+
+            # Convertissez le curseur en une liste de dictionnaires
+            quizzes = []
+            for quiz in quizzes_utilisateur:
+                # Convertir l'ObjectId en chaîne de caractères
+                quizzes.append(
+                    {
+                        "quizname": quiz["quizname"],
+                        "description": quiz["description"],
+                        "codequiz": quiz["codequiz"],
+                        # Ajoutez d'autres informations de quiz si nécessaire
+                    }
+                )
+
+            return jsonify({"quizzes": quizzes}), 200
+
+        else:
+            return jsonify({"message": "usernotexiste"}), 404
+
+
+@app.route("/createquestion", methods=["POST"])
+def ajouter_question():
+    data = request.json
+    print(data.get("email"))
+
+    email = data.get("email")
+
+    if email == "":
+        return jsonify({"message": "problemeemail"}), 404
+
+    else:
+        utilisateur = db.user.find_one({"email": email})
+
+        # Vérifiez si l'utilisateur existe
+        if utilisateur:
+            # Récupérez l'ID de l'utilisateur
+            user_id = utilisateur["_id"]
+
+            quiz = db.quiz.find_one(
+                {"quizname": data.get("quizname"), "idcreateur": user_id}
+            )
+
+            quiz_id = quiz["_id"]
+            question = {
+                "question": data.get("question"),
+                "reponcea": data.get("reponcea"),
+                "reponceb": data.get("reponceb"),
+                "reponcec": data.get("reponcec"),
+                "reponcecorecte": data.get("reponcecorecte"),
+                "quizid": quiz_id,
+            }
+            # Insérer le quiz dans la collection "question"
+            result = db.question.insert_one(question)
+
+            # Récupérer l'ID du quiz créé
+            question_id = result.inserted_id
+
+            # Mettre à jour la collection des question pour les quiz
+            db.quiz.update_one({"_id": quiz_id}, {"$push": {"question": question_id}})
+
+            return jsonify({"message": "questioncreer"}), 201
+
+        else:
+            return jsonify({"message": "usernotexiste"}), 404
+
+
+@app.route("/recupererAllQuestion", methods=["POST"])
+def recuper_allquestion():
+    data = request.json
+    # data = dataArray[0]
+    print(data.get("emailteacher"))
+    print(data.get("quizname"))
+
+    email = data.get("emailteacher")
+    quizname = data.get("quizname")
+
+    if email == "":
+        return jsonify({"message": "problemeemail"}), 404
+
+    else:
+        utilisateur = db.user.find_one({"email": email})
+        # Vérifiez si l'utilisateur existe
+        if utilisateur:
+            # Récupérez l'ID de l'utilisateur
+            user_id = utilisateur["_id"]
+            print("userid ", user_id)
+
+            quiz = db.quiz.find_one(
+                {"quizname": data.get("quizname"), "idcreateur": user_id}
+            )
+            quiz_id = quiz["_id"]
+            print("quiz_id", quiz_id)
+
+            # Recherchez tous les quizzes créés par cet utilisateur
+            question_utilisateur = db.question.find({"quizid": quiz_id})
+
+            # Convertissez le curseur en une liste de dictionnaires
+            questions = []
+            for question in question_utilisateur:
+                # Convertir l'ObjectId en chaîne de caractères
+                print(question)
+                questions.append(
+                    {
+                        "question": question["question"],
+                        "reponcea": question["reponcea"],
+                        "reponceb": question["reponceb"],
+                        "reponcec": question["reponcec"],
+                        "reponcecorecte": question["reponcecorecte"],
+                        # Ajoutez d'autres informations de quiz si nécessaire
+                    }
+                )
+            print((questions))
+            return jsonify({"questions": questions}), 200
+
+        else:
+            return jsonify({"message": "usernotexiste"}), 404
 
 
 @app.route("/ajouter_utilisateur2", methods=["GET"])
 def add_user_get():
     utilisateur = {
-        "id": "2",
         "nom": "med",
         "email": "elouafimed2@gmail.com",
         "password": "1234",
+        "fonctionaliter": "student",
     }
     # Insérer l'utilisateur dans la base de données
     db.user.insert_one(
@@ -62,50 +260,47 @@ def add_user_get():
     return jsonify({"message": "Utilisateur ajouté avec succès"}), 201
 
 
-@app.route("/startquiz", methods=["GET"])
+@app.route("/ratequiz", methods=["POST"])
 def start_quiz():
-    questions = {
-        "Quel langage de programmation est souvent utilisé pour le développement web?": {
-            "a": "Python",
-            "b": "JavaScript",
-            "c": "C#",
-            "correct": "b",
-        },
-        "Qu'est-ce qu'une boucle 'for' dans la plupart des langages de programmation?": {
-            "a": "Une structure de contrôle utilisée pour exécuter un bloc de code un nombre fixe de fois",
-            "b": "Une méthode pour déclarer des variables",
-            "c": "Une instruction pour terminer prématurément l'exécution d'un programme",
-            "correct": "a",
-        },
-        "Quel est le principal avantage de l'utilisation des fonctions dans la programmation?": {
-            "a": "Réduire la lisibilité du code",
-            "b": "Faciliter le débogage et la réutilisation du code",
-            "c": "Ralentir l'exécution du programme",
-            "correct": "b",
-        },
-        "Que signifie l'acronyme 'API' dans le contexte de la programmation?": {
-            "a": "Application Program Instruction",
-            "b": "Automated Programming Interface",
-            "c": "Application Programming Interface",
-            "correct": "c",
-        },
-        "Quel est le rôle principal d'un serveur dans une architecture client-serveur?": {
-            "a": "Gérer l'interface utilisateur",
-            "b": "Fournir des ressources et des services aux clients",
-            "c": "Interpréter le code source",
-            "correct": "b",
-        },
-    }
-    # Correction de la méthode pour renvoyer le contenu JSON avec le code de statut 200
-    return jsonify({"message": "ok", "quiz": questions}), 200
+    data = request.json
+    code_quiz = data["codequiz"]
+    emailprof = data["emailprof"]
+    emailstudent = data["emailstudent"]
+    localisation = data["localisation"]
+    score = data["score"]
 
+    prof = db.user.find_one({"email": emailprof})
+    student = db.student.find_one({"email": emailstudent})
+    if prof:
 
-@app.route("/score", methods=["GET"])
-def score():
-    data = request.get_json()
-    array1 = data[0]
-    corecteReponce = ["b", "a", "b", "c", "b"]
-    return jsonify({"message": "ok", "corecteReponce": corecteReponce}), 201
+        quiz = db.quiz.find_one({"codequiz": code_quiz, "idcreateur": prof["_id"]})
+        if quiz:
+
+            quipasse = db.quizpasse.find_one(
+                {"id_student": student["_id"], "id_quiz": quiz["_id"]}
+            )
+
+            if quipasse:
+                db.quizpasse.update_one(
+                    {"_id": quipasse["_id"]},
+                    {"$push": {"score": score, "localisation": localisation}},
+                )
+            else:
+                Quizpass = {
+                    "id_student": student["_id"],
+                    "id_quiz": quiz["_id"],
+                    "localisation": localisation,
+                    "score": score,
+                }
+                db.quizpasse.insert_one(Quizpass)
+
+                # Correction de la méthode pour renvoyer le contenu JSON avec le code de statut 200
+                return jsonify({"quiz": "quizrate"}), 200
+
+        else:
+            return jsonify({"message": "quiznotexiste"}), 404
+    else:
+        return jsonify({"message": "usernotexiste"}), 404
 
 
 if __name__ == "__main__":

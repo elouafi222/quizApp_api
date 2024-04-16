@@ -1,0 +1,7 @@
+path: C:\Users\MohammedElouafi\Desktop\MyWork\quizApp_api\quizApp_api\Dataset\SplitData
+train: train/images
+val: val/images
+test: test/images
+
+nc: 2
+names: ['fake', 'real']

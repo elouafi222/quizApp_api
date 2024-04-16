@@ -1,19 +1,20 @@
 import math
 import time
-
 import cv2
 import cvzone
 from ultralytics import YOLO
 
 confidence = 0.6
 
-cap = cv2.VideoCapture(1)  # For Webcam
+cap = cv2.VideoCapture(0)  # For Webcam
 cap.set(3, 640)
 cap.set(4, 480)
 # cap = cv2.VideoCapture("../Videos/motorbikes.mp4")  # For Video
 
 
-model = YOLO("../models/l_version_1_300.pt")
+model = YOLO(
+    "C:\\Users\\MohammedElouafi\\Desktop\\MyWork\\quizApp_api\\quizApp_api\\yolov8n.pt"
+)
 
 classNames = ["fake", "real"]
 
@@ -38,16 +39,21 @@ while True:
             cls = int(box.cls[0])
             if conf > confidence:
 
-                if classNames[cls] == 'real':
+                if classNames[cls] == "real":
                     color = (0, 255, 0)
                 else:
                     color = (0, 0, 255)
 
-                cvzone.cornerRect(img, (x1, y1, w, h),colorC=color,colorR=color)
-                cvzone.putTextRect(img, f'{classNames[cls].upper()} {int(conf*100)}%',
-                                   (max(0, x1), max(35, y1)), scale=2, thickness=4,colorR=color,
-                                   colorB=color)
-
+                cvzone.cornerRect(img, (x1, y1, w, h), colorC=color, colorR=color)
+                cvzone.putTextRect(
+                    img,
+                    f"{classNames[cls].upper()} {int(conf*100)}%",
+                    (max(0, x1), max(35, y1)),
+                    scale=2,
+                    thickness=4,
+                    colorR=color,
+                    colorB=color,
+                )
 
     fps = 1 / (new_frame_time - prev_frame_time)
     prev_frame_time = new_frame_time
