@@ -263,19 +263,32 @@ def add_user_get():
 @app.route("/ratequiz", methods=["POST"])
 def start_quiz():
     data = request.json
-    code_quiz = data["codequiz"]
+    quizname = data["quizname"]
     emailprof = data["emailprof"]
     emailstudent = data["emailstudent"]
-    localisation = data["localisation"]
+    localisation_latitude = data["localisation_latitude"]
+    localisation_longitude = data["localisation_longitude"]
     score = data["score"]
+
+    print("******* localition", localisation_latitude)
+    print("******* localition", localisation_longitude)
+
+    if localisation_latitude == "null":
+        localisation_latitude = 0.0
+    else:
+        localisation_latitude = float(localisation_latitude)
+
+    if localisation_longitude == "null":
+        localisation_longitude = 0.0
+    else:
+        localisation_longitude = float(localisation_longitude)
 
     prof = db.user.find_one({"email": emailprof})
     student = db.student.find_one({"email": emailstudent})
+
     if prof:
-
-        quiz = db.quiz.find_one({"codequiz": code_quiz, "idcreateur": prof["_id"]})
+        quiz = db.quiz.find_one({"quizname": quizname, "idcreateur": prof["_id"]})
         if quiz:
-
             quipasse = db.quizpasse.find_one(
                 {"id_student": student["_id"], "id_quiz": quiz["_id"]}
             )
@@ -283,24 +296,106 @@ def start_quiz():
             if quipasse:
                 db.quizpasse.update_one(
                     {"_id": quipasse["_id"]},
-                    {"$push": {"score": score, "localisation": localisation}},
+                    {
+                        "$set": {
+                            "score": score,
+                            "localisation_latitude": localisation_latitude,
+                            "localisation_longitude": localisation_longitude,
+                        }
+                    },
                 )
             else:
                 Quizpass = {
                     "id_student": student["_id"],
                     "id_quiz": quiz["_id"],
-                    "localisation": localisation,
+                    "localisation_latitude": localisation_latitude,
+                    "localisation_longitude": localisation_longitude,
                     "score": score,
                 }
                 db.quizpasse.insert_one(Quizpass)
 
-                # Correction de la méthode pour renvoyer le contenu JSON avec le code de statut 200
-                return jsonify({"quiz": "quizrate"}), 200
-
+            return jsonify({"quiz": "quizrate"}), 200
         else:
             return jsonify({"message": "quiznotexiste"}), 404
     else:
         return jsonify({"message": "usernotexiste"}), 404
+
+
+# 33.5729106  **************** logitude -7.6343454
+
+
+@app.route("/createquiepassetest", methods=["GET"])
+def start_quiz2():
+
+    Quizpass = {
+        "id_student": "66187814c94a436e422f07f0",
+        "id_quiz": "6618862a63c3c659045e93f0",
+        "name_student": "med2",
+        "localisation_latitude": 33.5729106,
+        "localisation_longitude": -7.6343454,
+        "score": 50,
+    }
+    db.quizpasse.insert_one(Quizpass)
+
+    Quizpass = {
+        "id_student": "66187814c94a436e422f07f1",
+        "id_quiz": "6618862a63c3c659045e93f0",
+        "name_student": "med3",
+        "localisation_latitude": 33.5729106,
+        "localisation_longitude": -7.4343454,
+        "score": 60,
+    }
+    db.quizpasse.insert_one(Quizpass)
+
+    Quizpass = {
+        "id_student": "66187814c94a436e422f07f2",
+        "id_quiz": "6618862a63c3c659045e93f0",
+        "name_student": "med5",
+        "localisation_latitude": 33.5729106,
+        "localisation_longitude": -7.3343454,
+        "score": 80,
+    }
+    db.quizpasse.insert_one(Quizpass)
+
+    # Correction de la méthode pour renvoyer le contenu JSON avec le code de statut 200
+    return jsonify({"quiz": "quizrate"}), 200
+
+
+@app.route("/recupererAllquizPasse", methods=["POST"])
+def get_quiz_rate():
+
+    quizname = request.json["quizname"]
+    emailprof = request.json["emailteacher"]
+
+    # quizname = "quiz22"
+    # emailprof = "elouafimed4@gmail.com"
+
+    prof = db.user.find_one({"email": emailprof})
+    print(prof)
+    quiz = db.quiz.find_one({"quizname": quizname, "idcreateur": prof["_id"]})
+    print(
+        "la valeur du quiz id est ",
+    )
+
+    quiz_id = str(quiz["_id"])
+
+    quizpasse_documents = db.quizpasse.find({"id_quiz": quiz_id})
+    print("recuperer quiz", quiz["_id"])
+
+    quizpasselist = []
+    for quiz in quizpasse_documents:
+        quizpasselist.append(
+            {
+                "name_student": quiz["name_student"],
+                "localisation_latitude": quiz["localisation_latitude"],
+                "localisation_longitude": quiz["localisation_longitude"],
+                "score": quiz["score"],
+            }
+        )
+
+    print(quizpasselist)
+
+    return jsonify({"quizpasse": quizpasselist}), 200
 
 
 if __name__ == "__main__":
